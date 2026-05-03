@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import sqlite3
-from contextlib import contextmanager
-from datetime import datetime
-from pathlib import Path
-from typing import Iterator
-
 from app.core.config import settings
+from app.shared.db import SQLiteRepository
+from app.shared.time import utc_now
 
 from .security import hash_password
 
@@ -16,25 +12,9 @@ DEFAULT_TOTP_SECRETS = {
 }
 
 
-def utc_now() -> str:
-    return datetime.utcnow().replace(microsecond=0).isoformat()
-
-
-class AuthRepository:
+class AuthRepository(SQLiteRepository):
     def __init__(self, db_path: str):
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
-
-    @contextmanager
-    def connect(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        try:
-            yield connection
-        finally:
-            connection.close()
+        super().__init__(db_path, enable_foreign_keys=True)
 
     def _initialize(self) -> None:
         with self.connect() as connection:
