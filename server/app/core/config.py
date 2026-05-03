@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -5,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-LEGACY_ROOT = ROOT_DIR.parents[1] / "Project"
+LEGACY_ROOT = Path(os.getenv("LEGACY_ROOT", str(ROOT_DIR.parents[1] / "Project")))
 
 
 class Settings(BaseSettings):
