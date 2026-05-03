@@ -1,0 +1,25 @@
+{
+  "files": [
+    {
+      "path": "assets/core-DhEqZVGG.js",
+      "sha256": "8261a5e51510afea7347ee6c40e783127639b88b158982711196012d6d50ceb3"
+    },
+    {
+      "path": "assets/index-B3W5Je3J.js",
+      "sha256": "644de7bf05903ad6f8f3701da3745a68c3defa9c4a3e0a6e43bc3f32dbcf2d56"
+    },
+    {
+      "path": "assets/index-Tzx3FsM9.css",
+      "sha256": "33a649201d39f2ac8e038fb6b6ce2feafa4b5fc07ac90bdd6d49ae868364e267"
+    },
+    {
+      "path": "assets/sidebar-logo-DisGhaZR.png",
+      "sha256": "28137b2c5d653dc97a43ea7a7774e92e8acc6c52b35ef64ba2f48438139f9e65"
+    },
+    {
+      "path": "index.html",
+      "sha256": "b65257e6c72f75970f0e4bda4995d9fcd1add4f7eb4b920abb99a77c96eb22a0"
+    }
+  ],
+  "version": 1
+}

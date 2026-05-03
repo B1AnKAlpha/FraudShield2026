@@ -1,0 +1,8 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+pydantic-settings==2.8.1
+python-multipart==0.0.20
+orjson==3.10.16
+openpyxl==3.1.5
+requests==2.32.3
+kafka-python==2.0.2
