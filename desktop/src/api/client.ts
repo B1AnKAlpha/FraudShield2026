@@ -163,5 +163,10 @@ export async function apiGetBlob(path: string): Promise<Blob> {
 }
 
 export function createEventStream(path: string): EventSource {
-  return new EventSource(`${API_BASE_URL}${path}`);
+  const token = readAccessToken();
+  const separator = path.includes("?") ? "&" : "?";
+  const url = token
+    ? `${API_BASE_URL}${path}${separator}token=${encodeURIComponent(token)}`
+    : `${API_BASE_URL}${path}`;
+  return new EventSource(url);
 }
