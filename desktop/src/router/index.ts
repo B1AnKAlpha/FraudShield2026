@@ -2,17 +2,18 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import AppShell from "@/components/AppShell.vue";
 import { readStoredSession } from "@/stores/auth";
-import AboutView from "@/views/AboutView.vue";
-import AnalysisView from "@/views/AnalysisView.vue";
-import FocusView from "@/views/FocusView.vue";
-import LoginView from "@/views/LoginView.vue";
-import MonitorView from "@/views/MonitorView.vue";
-import ParamsView from "@/views/ParamsView.vue";
-import PdfViewerView from "@/views/PdfViewerView.vue";
-import RealtimeView from "@/views/RealtimeView.vue";
-import ReportsView from "@/views/ReportsView.vue";
-import SettingsView from "@/views/SettingsView.vue";
-import WorkbenchView from "@/views/WorkbenchView.vue";
+
+const LoginView = () => import("@/views/LoginView.vue");
+const WorkbenchView = () => import("@/views/WorkbenchView.vue");
+const MonitorView = () => import("@/views/MonitorView.vue");
+const RealtimeView = () => import("@/views/RealtimeView.vue");
+const AnalysisView = () => import("@/views/AnalysisView.vue");
+const FocusView = () => import("@/views/FocusView.vue");
+const ReportsView = () => import("@/views/ReportsView.vue");
+const ParamsView = () => import("@/views/ParamsView.vue");
+const SettingsView = () => import("@/views/SettingsView.vue");
+const AboutView = () => import("@/views/AboutView.vue");
+const PdfViewerView = () => import("@/views/PdfViewerView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
