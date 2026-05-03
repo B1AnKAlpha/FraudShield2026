@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
     legacy_model_dir: str = str(LEGACY_ROOT / "final" / "model")
     legacy_static_data_path: str = str(LEGACY_ROOT / "final" / "data" / "静态.xlsx")
-    legacy_torch_python: str = r"E:\Conda\envs\torch\python.exe"
+    legacy_torch_python: str = "python"
     legacy_result_dir: str = str(LEGACY_ROOT / "final" / "result")
     legacy_report_file: str = str(LEGACY_ROOT / "final" / "result" / "report.html")
     realtime_light_model_path: str = str(ROOT_DIR / "data" / "models" / "realtime_light_model.joblib")
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     analysis_llm_timeout_seconds: int = 90
     analysis_enable_llm_normalization: bool = True
     analysis_http_trust_env: bool = False
+    auth_dev_totp_bypass: str = ""
 
 
 settings = Settings()

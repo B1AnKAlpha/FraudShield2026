@@ -29,7 +29,6 @@ from .security import (
 
 
 class AuthService:
-    MASTER_TOKEN_CODE = "123456"
 
     def _to_user_profile(self, user: dict) -> UserProfile:
         return UserProfile(
@@ -45,7 +44,8 @@ class AuthService:
         )
 
     def _verify_token_code(self, user: dict, token_code: str) -> None:
-        if token_code.strip() == self.MASTER_TOKEN_CODE:
+        dev_bypass = settings.auth_dev_totp_bypass
+        if dev_bypass and token_code.strip() == dev_bypass:
             return
 
         if not user.get("totp_secret"):
