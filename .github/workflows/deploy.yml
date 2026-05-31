@@ -24,14 +24,12 @@ jobs:
 
       - name: Deploy Backend
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             set -e
 
-            # 创建部署目录
             mkdir -p /opt/fraudshield2026/server
             cd /opt/fraudshield2026
 
-            # 克隆或更新代码
             if [ -d ".git" ]; then
               git fetch origin
               git reset --hard origin/master
@@ -39,22 +37,19 @@ jobs:
               git clone https://github.com/${{ github.repository }} .
             fi
 
-            # 安装 Python 依赖
             cd server
             python3 -m venv .venv || true
             source .venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 配置环境变量
             if [ ! -f .env ]; then
               cp .env.example .env
               echo "AUTH_DEV_TOTP_BYPASS=1" >> .env
             fi
 
-            # 重启服务
             sudo systemctl restart fraudshield-backend || echo "服务未配置，稍后手动启动"
-          EOF
+          ENDSSH
 
       - name: Build Frontend
         run: |
@@ -64,28 +59,22 @@ jobs:
 
       - name: Deploy Frontend
         run: |
-          # 上传前端构建产物
           scp -i ~/.ssh/id_rsa -r desktop/dist/* root@${{ secrets.SERVER_HOST }}:/opt/fraudshield2026/frontend/
 
-          # 配置 Nginx
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'EOF'
-            # 创建前端目录
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             mkdir -p /opt/fraudshield2026/frontend
 
-            # 配置 Nginx（如果还没配置）
             if [ ! -f /etc/nginx/sites-available/fraudshield ]; then
-              cat > /etc/nginx/sites-available/fraudshield << 'NGINX'
+              cat > /etc/nginx/sites-available/fraudshield <<'ENDNGINX'
 server {
     listen 80;
     server_name _;
 
-    # 前端静态文件
     location / {
         root /opt/fraudshield2026/frontend;
         try_files $uri $uri/ /index.html;
     }
 
-    # 后端 API 代理
     location /api/ {
         proxy_pass http://127.0.0.1:8001;
         proxy_set_header Host $host;
@@ -94,22 +83,20 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # 健康检查
     location /health {
         proxy_pass http://127.0.0.1:8001;
     }
 }
-NGINX
+ENDNGINX
               ln -sf /etc/nginx/sites-available/fraudshield /etc/nginx/sites-enabled/
               nginx -t && systemctl reload nginx
             fi
-          EOF
+          ENDSSH
 
       - name: Setup Systemd Service
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'EOF'
-            # 创建 systemd 服务文件
-            cat > /etc/systemd/system/fraudshield-backend.service << 'SERVICE'
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+            cat > /etc/systemd/system/fraudshield-backend.service <<'ENDSERVICE'
 [Unit]
 Description=FraudShield 2026 Backend API
 After=network.target
@@ -125,21 +112,19 @@ RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-SERVICE
+ENDSERVICE
 
-            # 启用并启动服务
             systemctl daemon-reload
             systemctl enable fraudshield-backend
             systemctl restart fraudshield-backend
 
-            # 检查服务状态
             sleep 3
             systemctl status fraudshield-backend --no-pager || true
-          EOF
+          ENDSSH
 
       - name: Verify Deployment
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             echo "=== 服务状态 ==="
             systemctl is-active fraudshield-backend || echo "后端服务未运行"
 
@@ -150,7 +135,7 @@ SERVICE
             echo ""
             echo "=== 健康检查 ==="
             curl -s http://localhost:8001/health || echo "健康检查失败"
-          EOF
+          ENDSSH
 
       - name: Deployment Summary
         run: |
