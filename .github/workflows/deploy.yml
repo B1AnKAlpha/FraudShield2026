@@ -24,31 +24,26 @@ jobs:
 
       - name: Deploy Backend
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             set -e
-
             mkdir -p /opt/fraudshield2026/server
             cd /opt/fraudshield2026
-
             if [ -d ".git" ]; then
               git fetch origin
               git reset --hard origin/master
             else
               git clone https://github.com/${{ github.repository }} .
             fi
-
             cd server
             python3 -m venv .venv || true
             source .venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
-
             if [ ! -f .env ]; then
               cp .env.example .env
               echo "AUTH_DEV_TOTP_BYPASS=1" >> .env
             fi
-
-            sudo systemctl restart fraudshield-backend || echo "服务未配置，稍后手动启动"
+            sudo systemctl restart fraudshield-backend 2>/dev/null || echo "服务未配置"
           ENDSSH
 
       - name: Build Frontend
@@ -61,33 +56,29 @@ jobs:
         run: |
           scp -i ~/.ssh/id_rsa -r desktop/dist/* root@${{ secrets.SERVER_HOST }}:/opt/fraudshield2026/frontend/
 
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+      - name: Configure Nginx
+        run: |
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             mkdir -p /opt/fraudshield2026/frontend
-
             if [ ! -f /etc/nginx/sites-available/fraudshield ]; then
-              cat > /etc/nginx/sites-available/fraudshield <<'ENDNGINX'
-server {
-    listen 80;
-    server_name _;
-
-    location / {
-        root /opt/fraudshield2026/frontend;
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /health {
-        proxy_pass http://127.0.0.1:8001;
-    }
-}
-ENDNGINX
+              tee /etc/nginx/sites-available/fraudshield > /dev/null << 'ENDNGINX'
+          server {
+              listen 80;
+              server_name _;
+              location / {
+                  root /opt/fraudshield2026/frontend;
+                  try_files $uri $uri/ /index.html;
+              }
+              location /api/ {
+                  proxy_pass http://127.0.0.1:8001;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+              location /health {
+                  proxy_pass http://127.0.0.1:8001;
+              }
+          }
+          ENDNGINX
               ln -sf /etc/nginx/sites-available/fraudshield /etc/nginx/sites-enabled/
               nginx -t && systemctl reload nginx
             fi
@@ -95,43 +86,37 @@ ENDNGINX
 
       - name: Setup Systemd Service
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
-            cat > /etc/systemd/system/fraudshield-backend.service <<'ENDSERVICE'
-[Unit]
-Description=FraudShield 2026 Backend API
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/fraudshield2026/server
-Environment="PATH=/opt/fraudshield2026/server/.venv/bin"
-ExecStart=/opt/fraudshield2026/server/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 2
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-ENDSERVICE
-
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
+            tee /etc/systemd/system/fraudshield-backend.service > /dev/null << 'ENDSERVICE'
+          [Unit]
+          Description=FraudShield 2026 Backend API
+          After=network.target
+          [Service]
+          Type=simple
+          User=root
+          WorkingDirectory=/opt/fraudshield2026/server
+          Environment="PATH=/opt/fraudshield2026/server/.venv/bin"
+          ExecStart=/opt/fraudshield2026/server/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 2
+          Restart=always
+          RestartSec=10
+          [Install]
+          WantedBy=multi-user.target
+          ENDSERVICE
             systemctl daemon-reload
             systemctl enable fraudshield-backend
             systemctl restart fraudshield-backend
-
             sleep 3
             systemctl status fraudshield-backend --no-pager || true
           ENDSSH
 
       - name: Verify Deployment
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             echo "=== 服务状态 ==="
             systemctl is-active fraudshield-backend || echo "后端服务未运行"
-
             echo ""
             echo "=== 端口监听 ==="
             netstat -tlnp | grep -E ':80|:8001' || echo "端口未监听"
-
             echo ""
             echo "=== 健康检查 ==="
             curl -s http://localhost:8001/health || echo "健康检查失败"
