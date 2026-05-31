@@ -58,7 +58,7 @@ def render_report(*, job_id: str, assets: list[dict], normalized: dict, result: 
       margin: 0mm;
     }}
     html {{
-      font-family: "Microsoft YaHei", "SimHei", Arial, sans-serif;
+      font-family: "Noto Sans CJK SC", "WenQuanYi Micro Hei", "Microsoft YaHei", "SimHei", Arial, sans-serif;
       color: #333;
       margin: 0;
       padding: 0;
@@ -447,9 +447,39 @@ def _extract_report_user_rows(normalized: dict, result: dict) -> list[dict[str, 
 
 
 def write_pdf_report(report_path: Path, pdf_path: Path) -> None:
+    # 优先使用wkhtmltopdf（Linux服务器友好）
+    wkhtmltopdf_path = _find_wkhtmltopdf()
+    if wkhtmltopdf_path is not None:
+        command = [
+            str(wkhtmltopdf_path),
+            "--enable-local-file-access",
+            "--page-size", "A4",
+            "--margin-top", "0mm",
+            "--margin-bottom", "0mm",
+            "--margin-left", "0mm",
+            "--margin-right", "0mm",
+            "--no-stop-slow-scripts",
+            "--javascript-delay", "1000",
+            str(report_path.resolve()),
+            str(pdf_path.resolve()),
+        ]
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=120,
+            check=False,
+        )
+        if completed.returncode == 0 and pdf_path.exists():
+            return
+        # wkhtmltopdf失败，尝试浏览器方案
+
+    # 备用方案：使用浏览器
     edge_executable = _find_edge_executable()
     if edge_executable is None:
-        raise RuntimeError("未找到 Microsoft Edge，无法导出 PDF 报告")
+        raise RuntimeError("未找到 wkhtmltopdf 或浏览器，无法导出 PDF 报告")
 
     profile_dir = report_path.parent / ".edge-pdf-profile"
     profile_dir.mkdir(parents=True, exist_ok=True)
@@ -457,6 +487,9 @@ def write_pdf_report(report_path: Path, pdf_path: Path) -> None:
         str(edge_executable),
         "--headless",
         "--disable-gpu",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-software-rasterizer",
         "--allow-file-access-from-files",
         "--no-first-run",
         "--no-default-browser-check",
@@ -479,12 +512,35 @@ def write_pdf_report(report_path: Path, pdf_path: Path) -> None:
         raise RuntimeError(detail or "PDF 报告生成失败")
 
 
-def _find_edge_executable() -> Path | None:
+def _find_wkhtmltopdf() -> Path | None:
     candidates = [
+        Path("/usr/bin/wkhtmltopdf"),
+        Path("/usr/local/bin/wkhtmltopdf"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _find_edge_executable() -> Path | None:
+    # Linux环境优先使用Chromium
+    linux_candidates = [
+        Path("/snap/bin/chromium"),
+        Path("/usr/bin/chromium-browser"),
+        Path("/usr/bin/chromium"),
+        Path("/usr/bin/google-chrome"),
+    ]
+    for candidate in linux_candidates:
+        if candidate.exists():
+            return candidate
+
+    # Windows环境使用Edge
+    windows_candidates = [
         Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
         Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
     ]
-    for candidate in candidates:
+    for candidate in windows_candidates:
         if candidate.exists():
             return candidate
     return None
