@@ -22,12 +22,16 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-          # 测试 SSH 连接
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ secrets.SERVER_HOST }} "echo 'SSH 连接成功'"
+          # 启动 ssh-agent 并添加密钥
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+
+          # 测试连接
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_HOST }} "echo 'SSH 连接成功'"
 
       - name: Deploy Backend
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             set -e
             mkdir -p /opt/fraudshield2026/server
             cd /opt/fraudshield2026
@@ -57,11 +61,11 @@ jobs:
 
       - name: Deploy Frontend
         run: |
-          scp -i ~/.ssh/id_rsa -r desktop/dist/* root@${{ secrets.SERVER_HOST }}:/opt/fraudshield2026/frontend/
+          scp -o StrictHostKeyChecking=no -r desktop/dist/* root@${{ secrets.SERVER_HOST }}:/opt/fraudshield2026/frontend/
 
       - name: Configure Nginx
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             mkdir -p /opt/fraudshield2026/frontend
             if [ ! -f /etc/nginx/sites-available/fraudshield ]; then
               tee /etc/nginx/sites-available/fraudshield > /dev/null << 'ENDNGINX'
@@ -89,7 +93,7 @@ jobs:
 
       - name: Setup Systemd Service
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             tee /etc/systemd/system/fraudshield-backend.service > /dev/null << 'ENDSERVICE'
           [Unit]
           Description=FraudShield 2026 Backend API
@@ -114,7 +118,7 @@ jobs:
 
       - name: Verify Deployment
         run: |
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_HOST }} bash -s << 'ENDSSH'
             echo "=== 服务状态 ==="
             systemctl is-active fraudshield-backend || echo "后端服务未运行"
             echo ""
