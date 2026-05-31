@@ -94,6 +94,21 @@ class AuthRepository(SQLiteRepository):
             now = utc_now()
             default_users = [
                 (
+                    "1",
+                    hash_password("1"),
+                    "指令管理员",
+                    "admin",
+                    "FraudShield Lab",
+                    "00000000000",
+                    "dev@fraudshield.com",
+                    "DEV",
+                    1,
+                    None,
+                    None,
+                    now,
+                    now,
+                ),
+                (
                     "admin",
                     hash_password("admin"),
                     "系统管理员",

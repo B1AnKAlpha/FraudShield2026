@@ -13,8 +13,12 @@ class HybridAnalysisAdapter:
         self.model_dir = Path(settings.legacy_model_dir)
         self.static_data_path = Path(settings.legacy_static_data_path)
         self.script_path = Path(__file__).resolve().parents[3] / "scripts" / "legacy_hybrid_infer.py"
-        self.conda_executable = self.python_executable.parents[2] / "Scripts" / "conda.exe"
-        self.conda_env_name = self.python_executable.parent.name
+        try:
+            self.conda_executable = self.python_executable.parents[2] / "Scripts" / "conda.exe"
+            self.conda_env_name = self.python_executable.parent.name
+        except IndexError:
+            self.conda_executable = Path("conda")
+            self.conda_env_name = ""
 
     def available(self) -> bool:
         return (

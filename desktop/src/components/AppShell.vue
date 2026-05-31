@@ -93,7 +93,7 @@
             <button class="legacy-settings-item" type="button" @click="toggleTheme">
               <span class="legacy-nav-icon legacy-icon-wrap" v-html="icons.theme"></span>
               <span>改变主题</span>
-              <strong>{{ themeMode === "light" ? "浅色" : (themeMode === "modern" ? "现代" : "深色") }}</strong>
+              <strong>{{ themeMode === "light" ? "经典紫" : (themeMode === "modern" ? "海蓝" : "暗夜紫") }}</strong>
             </button>
 
             <button class="legacy-settings-item" type="button" @click="handleCheckUpdate">

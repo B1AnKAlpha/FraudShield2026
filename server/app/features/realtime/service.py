@@ -74,6 +74,7 @@ class RealtimeService:
         self._simulated_kafka_index = 0
         self._simulated_kafka_round = 0
         self._channels = ["手机银行", "网银", "柜面", "ATM", "第三方支付"]
+        self._channel_weights = [0.35, 0.25, 0.10, 0.08, 0.22]
         self._channel_codes = {
             "手机银行": "MOBILE",
             "网银": "ONLINE",
@@ -81,29 +82,34 @@ class RealtimeService:
             "ATM": "ATM",
             "第三方支付": "THIRDPAY",
         }
-        self._family_names = list("赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦许何吕施张孔曹严华金魏陶姜")
+        self._family_names = list("赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章苏潘葛范彭郎鲁韦昌马苗凤花方俞任袁柳邓")
         self._given_names = [
-            "伟",
-            "磊",
-            "静",
-            "玲",
-            "军",
-            "建华",
-            "桂芳",
-            "帆",
-            "雪",
-            "楠",
-            "浩",
-            "敏",
-            "丹",
-            "博",
-            "颖",
-            "凯",
-            "洋",
-            "婷",
-            "超",
-            "晨",
+            "伟", "磊", "静", "玲", "军", "帆", "雪", "楠", "浩", "敏",
+            "丹", "博", "颖", "凯", "洋", "婷", "超", "晨", "鑫", "悦",
         ]
+        self._given_names_compound = [
+            "建华", "桂芳", "志强", "秀英", "明辉", "丽娟", "国强", "淑珍",
+            "文博", "雅琴", "天宇", "思涵", "浩然", "欣怡", "子轩", "梓萱",
+        ]
+        self._normal_memos = [
+            "工资代发", "货款结算", "生活消费", "房租转账", "保险缴费",
+            "水电燃气", "信用卡还款", "基金申购", "往来款", "借款归还",
+            "采购货款", "服务费", "咨询费", "物业费", "学费缴纳",
+            "差旅报销", "税款缴纳", "劳务报酬", "分红款", "投资收益",
+        ]
+        self._suspicious_memos = [
+            "投资咨询费", "技术服务费", "居间服务费", "信息服务费",
+            "往来款", "借款", "代付款", "保证金", "咨询顾问费",
+            "商务合作款", "市场推广费", "平台充值",
+        ]
+        self._bank_codes = [
+            "102100099996", "103100000026", "104100000004", "105100000017",
+            "301290000007", "302100011000", "303100000006", "305100000013",
+            "306581000003", "307584007998", "308584000013", "309391000011",
+            "310290000013", "313100000013", "314100000060", "315100000013",
+            "316100000011", "317100000014", "318100000014", "319100000014",
+        ]
+        self._account_balances: dict[str, float] = {}
         self._simulated_kafka_pool = self._build_simulated_kafka_pool(size=300)
         self._source = os.getenv("FS_REALTIME_SOURCE", "kafka").strip().lower()
         self._kafka_bootstrap = os.getenv("FS_KAFKA_BOOTSTRAP", "47.109.150.203:9092").strip()
@@ -219,9 +225,37 @@ class RealtimeService:
         if account in self._focus_accounts:
             name = f"重点账户{account[-4:]}"
         else:
-            name = self._rng.choice(self._family_names) + self._rng.choice(self._given_names) + self._rng.choice(self._given_names)
+            family = self._rng.choice(self._family_names)
+            if self._rng.random() < 0.45:
+                given = self._rng.choice(self._given_names_compound)
+            else:
+                given = self._rng.choice(self._given_names)
+            name = family + given
         self._account_name_cache[account] = name
         return name
+
+    def _get_account_balance(self, account: str, amount: float, is_outflow: bool) -> float:
+        if account not in self._account_balances:
+            self._account_balances[account] = round(self._rng.uniform(8000.0, 450000.0), 2)
+        balance = self._account_balances[account]
+        if is_outflow:
+            balance = max(balance - amount, round(self._rng.uniform(200, 5000), 2))
+        else:
+            balance += amount
+        self._account_balances[account] = round(balance, 2)
+        return self._account_balances[account]
+
+    def _pick_channel_weighted(self) -> str:
+        return self._rng.choices(self._channels, weights=self._channel_weights, k=1)[0]
+
+    def _counterparty_score(self, account: str, counterparty: str) -> float:
+        state = self._account_states.get(account)
+        if not state or not state.events:
+            return round(self._rng.uniform(0, 20), 1)
+        past_counterparties = {e.counterparty for e in state.events}
+        if counterparty in past_counterparties:
+            return round(self._rng.uniform(5, 35), 1)
+        return round(self._rng.uniform(40, 90), 1)
 
     def _pick_amount(self) -> float:
         level = self._rng.random()
@@ -268,30 +302,62 @@ class RealtimeService:
     def _build_simulated_kafka_pool(self, size: int = 300) -> list[dict]:
         pool: list[dict] = []
         for index in range(size):
-            if index < size * 0.42:
+            if index < size * 0.30:
                 pool.append(self._generate_legacy_kafka_message(prefer_suspicious=True))
-            elif index < size * 0.78:
+            elif index < size * 0.75:
                 pool.append(self._generate_legacy_kafka_message(prefer_suspicious=False))
             else:
                 pool.append(self._generate_legacy_kafka_message(prefer_suspicious=None))
+        self._rng.shuffle(pool)
         return pool
 
     def _generate_legacy_kafka_message(self, prefer_suspicious: bool | None = None) -> dict:
-        suspicious = prefer_suspicious if prefer_suspicious is not None else self._rng.random() < 0.38
+        suspicious = prefer_suspicious if prefer_suspicious is not None else self._rng.random() < 0.32
         if suspicious:
-            payer_account = self._scenario_hub_account
-            receiver_account = self._rng.choice(self._scenario_counterparties)
-            amount = round(self._rng.uniform(18000, 150000), 2)
-            direction = "0"
-            channel = self._rng.choice(["手机银行", "网银", "第三方支付"])
+            scenario = self._rng.random()
+            if scenario < 0.40:
+                payer_account = self._scenario_hub_account
+                receiver_account = self._rng.choice(self._scenario_counterparties)
+                amount = round(self._rng.uniform(25000, 150000), 2)
+                direction = "0"
+                channel = self._rng.choice(["手机银行", "网银", "第三方支付"])
+                memo = self._rng.choice(self._suspicious_memos)
+            elif scenario < 0.65:
+                receiver_account = self._scenario_hub_account
+                payer_account = self._rng.choice(self._scenario_counterparties)
+                amount = round(self._rng.uniform(30000, 120000), 2)
+                direction = "1"
+                channel = self._rng.choice(["网银", "第三方支付"])
+                memo = self._rng.choice(self._suspicious_memos)
+            elif scenario < 0.85:
+                cp_a = self._rng.choice(self._scenario_counterparties)
+                others = [c for c in self._scenario_counterparties if c != cp_a]
+                cp_b = self._rng.choice(others) if others else self._pick_account(exclude=cp_a)
+                payer_account = cp_a
+                receiver_account = cp_b
+                amount = round(self._rng.uniform(15000, 80000), 2)
+                direction = "0"
+                channel = self._rng.choice(["手机银行", "第三方支付"])
+                memo = self._rng.choice(self._suspicious_memos)
+            else:
+                payer_account = self._pick_account()
+                receiver_account = self._pick_account(exclude=payer_account)
+                amount = round(self._rng.uniform(48000, 198000), 2)
+                direction = "0"
+                channel = "第三方支付"
+                memo = self._rng.choice(self._suspicious_memos)
         else:
             payer_account = self._pick_account()
             receiver_account = self._pick_account(exclude=payer_account)
             amount = self._pick_amount()
-            direction = "1" if self._rng.random() >= 0.5 else "0"
-            channel = self._rng.choice(self._channels)
+            direction = "1" if self._rng.random() >= 0.45 else "0"
+            channel = self._pick_channel_weighted()
+            memo = self._rng.choice(self._normal_memos)
         payer_name = self._get_account_name(payer_account)
         receiver_name = self._get_account_name(receiver_account)
+        is_outflow = direction == "0"
+        balance = self._get_account_balance(payer_account, amount, is_outflow)
+        cp_score = self._counterparty_score(payer_account, receiver_account)
         now = datetime.now()
         return {
             "jylsxh": f"JY{now.strftime('%Y%m%d%H%M%S')}{self._rng.randint(100000, 999999)}",
@@ -301,12 +367,13 @@ class RealtimeService:
             "dfxm": receiver_name,
             "jdbj": direction,
             "jyje": amount,
-            "zhye": round(self._rng.uniform(1000.0, 500000.0), 2),
-            "dfhh": f"{self._rng.randint(10000000, 99999999)}",
+            "zhye": balance,
+            "dfhh": self._rng.choice(self._bank_codes),
             "jyrq": now.strftime("%Y/%m/%d"),
             "jysj": now.strftime("%H:%M:%S"),
             "jyqd": self._channel_codes[channel],
-            "dfmccd": len(receiver_name),
+            "zy": memo,
+            "dfmccd": cp_score,
         }
 
     def _next_simulated_kafka_message(self) -> dict:
@@ -638,19 +705,36 @@ class RealtimeService:
         )
 
     def _generate_transaction(self, prefer_suspicious: bool | None = None) -> RealtimeTransactionItem:
-        suspicious = prefer_suspicious if prefer_suspicious is not None else self._rng.random() < 0.38
+        suspicious = prefer_suspicious if prefer_suspicious is not None else self._rng.random() < 0.32
         if suspicious:
-            payer_account = self._scenario_hub_account
-            receiver_account = self._rng.choice(self._scenario_counterparties)
-            amount = round(self._rng.uniform(18000, 150000), 2)
-            direction = "支出"
-            channel = self._rng.choice(["手机银行", "网银", "第三方支付"])
+            scenario = self._rng.random()
+            if scenario < 0.45:
+                payer_account = self._scenario_hub_account
+                receiver_account = self._rng.choice(self._scenario_counterparties)
+                amount = round(self._rng.uniform(25000, 150000), 2)
+                direction = "支出"
+                channel = self._rng.choice(["手机银行", "网银", "第三方支付"])
+            elif scenario < 0.70:
+                receiver_account = self._scenario_hub_account
+                payer_account = self._rng.choice(self._scenario_counterparties)
+                amount = round(self._rng.uniform(30000, 120000), 2)
+                direction = "收入"
+                channel = self._rng.choice(["网银", "第三方支付"])
+            else:
+                payer_account = self._pick_account()
+                receiver_account = self._pick_account(exclude=payer_account)
+                amount = round(self._rng.uniform(48000, 198000), 2)
+                direction = "支出"
+                channel = "第三方支付"
         else:
             payer_account = self._pick_account()
             receiver_account = self._pick_account(exclude=payer_account)
             amount = self._pick_amount()
-            direction = "收入" if self._rng.random() >= 0.5 else "支出"
-            channel = self._rng.choice(self._channels)
+            direction = "收入" if self._rng.random() >= 0.45 else "支出"
+            channel = self._pick_channel_weighted()
+        is_outflow = direction == "支出"
+        balance = self._get_account_balance(payer_account, amount, is_outflow)
+        cp_score = self._counterparty_score(payer_account, receiver_account)
         return self._build_transaction(
             transaction_id=f"TXN-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._rng.randint(1000, 9999)}",
             payer_account=payer_account,
@@ -661,8 +745,8 @@ class RealtimeService:
             direction=direction,
             channel=channel,
             event_time=datetime.now().isoformat(timespec="seconds"),
-            balance=round(self._rng.uniform(2000.0, 300000.0), 2),
-            counterparty_score=float(self._rng.randint(0, 100)),
+            balance=balance,
+            counterparty_score=cp_score,
         )
 
     def _register_transaction_state(self, item: RealtimeTransactionItem) -> None:
@@ -738,9 +822,9 @@ class RealtimeService:
     def _ensure_activity(self) -> None:
         now = datetime.now().timestamp()
         delta_seconds = now - self._last_generated_at
-        if delta_seconds < 1.2:
+        if delta_seconds < 0.5:
             return
-        missing = max(1, min(5, int(delta_seconds // 1.2)))
+        missing = max(1, min(12, int(delta_seconds // 0.5)))
 
         if self._source == "kafka" and self._kafka_enabled:
             if self._kafka_simulator_enabled:
@@ -789,7 +873,7 @@ class RealtimeService:
                 self._ensure_activity()
                 payload = self._snapshot().model_dump()
             yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.8)
 
 
 service = RealtimeService()

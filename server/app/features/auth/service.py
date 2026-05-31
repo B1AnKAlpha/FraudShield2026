@@ -44,12 +44,13 @@ class AuthService:
         )
 
     def _verify_token_code(self, user: dict, token_code: str) -> None:
+        if not user.get("totp_secret"):
+            return
+
         dev_bypass = settings.auth_dev_totp_bypass
         if dev_bypass and token_code.strip() == dev_bypass:
             return
 
-        if not user.get("totp_secret"):
-            raise AppError("当前账户尚未绑定动态令牌", status_code=409, code="TOTP_NOT_BOUND")
         if not verify_totp_code(user["totp_secret"], token_code):
             raise AppError("动态令牌错误", status_code=401, code="INVALID_TOKEN_CODE")
 
