@@ -40,6 +40,7 @@ jobs:
             if [ -d ".git" ]; then
               git fetch origin
               git reset --hard origin/master
+              git pull origin master
             else
               git clone https://github.com/${{ github.repository }} .
             fi
