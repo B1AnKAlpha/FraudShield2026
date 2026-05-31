@@ -52,6 +52,9 @@ jobs:
             if [ ! -f .env ]; then
               cp .env.example .env
               echo "AUTH_DEV_TOTP_BYPASS=1" >> .env
+              echo "首次部署：已创建 .env 文件"
+            else
+              echo ".env 文件已存在，保留现有配置"
             fi
             sudo systemctl restart fraudshield-backend 2>/dev/null || echo "服务未配置"
           ENDSSH
