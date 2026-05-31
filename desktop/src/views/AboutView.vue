@@ -22,25 +22,6 @@
     </section>
 
     <section class="panel about-document-panel">
-      <div class="about-info-grid">
-        <div class="about-info-block">
-          <div class="about-info-title">系统名称</div>
-          <div class="about-info-value">金盾 FraudShield 金融数据欺诈检测系统</div>
-        </div>
-        <div class="about-info-block">
-          <div class="about-info-title">检测引擎</div>
-          <div class="about-info-value">{{ overview?.detection_engine ?? "Hybrid + Realtime Light Model" }}</div>
-        </div>
-        <div class="about-info-block">
-          <div class="about-info-title">实时模式</div>
-          <div class="about-info-value">{{ overview?.realtime_mode ?? "--" }}</div>
-        </div>
-        <div class="about-info-block">
-          <div class="about-info-title">服务名称</div>
-          <div class="about-info-value">{{ overview?.server_name ?? "FraudShield 2026 API" }}</div>
-        </div>
-      </div>
-
       <div class="info-document compact about-document-copy">
         <h3>系统说明</h3>
         <p>本系统用于金融欺诈风险识别、实时监测、链路分析、重点关注与历史报告管理。</p>
@@ -60,11 +41,10 @@ import { useSystemStore } from "@/stores/system";
 
 const systemStore = useSystemStore();
 
-const overview = computed(() => systemStore.overview);
 const paramsOverview = computed(() => systemStore.paramsOverview);
 
 onMounted(() => {
-  if ((!systemStore.overview || !systemStore.paramsOverview) && !systemStore.loading) {
+  if (!systemStore.paramsOverview && !systemStore.loading) {
     void systemStore.loadOverview();
   }
 });
